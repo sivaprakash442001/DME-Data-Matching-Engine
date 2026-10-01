@@ -415,6 +415,9 @@ function displayResults(data) {
     applyFilters();
 }
 
+let currentPage = 1;
+let pageSize = 50;
+
 // Filter and search results in table
 function applyFilters() {
     const query = document.getElementById('tableSearch').value.toLowerCase().trim();
@@ -433,10 +436,9 @@ function applyFilters() {
 
         // Text query
         if (query) {
-            const exp = r.explanation;
-            const strA = (exp.original_a || '').toLowerCase();
-            const strB = (exp.original_b || '').toLowerCase();
-            const summary = (exp.summary || '').toLowerCase();
+            const strA = (r.original_a || (r.explanation && r.explanation.original_a) || '').toLowerCase();
+            const strB = (r.original_b || (r.explanation && r.explanation.original_b) || '').toLowerCase();
+            const summary = (r.summary || (r.explanation && r.explanation.summary) || '').toLowerCase();
             if (!strA.includes(query) && !strB.includes(query) && !summary.includes(query)) {
                 return false;
             }
@@ -450,13 +452,18 @@ function applyFilters() {
         filteredResults.sort((a, b) => {
             if (currentSort.column === 'row') return (a.row_index - b.row_index) * dir;
             if (currentSort.column === 'score') return (a.score - b.score) * dir;
-            if (currentSort.column === 'val_a') return (a.explanation.original_a || '').localeCompare(b.explanation.original_a || '') * dir;
-            if (currentSort.column === 'val_b') return (a.explanation.original_b || '').localeCompare(b.explanation.original_b || '') * dir;
+            const strA1 = (a.original_a || (a.explanation && a.explanation.original_a) || '');
+            const strA2 = (b.original_a || (b.explanation && b.explanation.original_a) || '');
+            if (currentSort.column === 'val_a') return strA1.localeCompare(strA2) * dir;
+            const strB1 = (a.original_b || (a.explanation && a.explanation.original_b) || '');
+            const strB2 = (b.original_b || (b.explanation && b.explanation.original_b) || '');
+            if (currentSort.column === 'val_b') return strB1.localeCompare(strB2) * dir;
             if (currentSort.column === 'status') return (a.status || '').localeCompare(b.status || '') * dir;
             return 0;
         });
     }
 
+    currentPage = 1;
     renderTable();
 }
 
@@ -490,21 +497,75 @@ window.sortTable = function(column) {
     applyFilters();
 };
 
-// Render Results Table Rows
+// Pagination Helpers
+window.changePageSize = function(size) {
+    pageSize = parseInt(size, 10) || 50;
+    currentPage = 1;
+    renderTable();
+};
+
+window.goToPage = function(page) {
+    const totalPages = Math.ceil(filteredResults.length / pageSize) || 1;
+    currentPage = Math.max(1, Math.min(page, totalPages));
+    renderTable();
+};
+
+window.changePage = function(delta) {
+    const totalPages = Math.ceil(filteredResults.length / pageSize) || 1;
+    currentPage = Math.max(1, Math.min(currentPage + delta, totalPages));
+    renderTable();
+};
+
+window.goToLastPage = function() {
+    const totalPages = Math.ceil(filteredResults.length / pageSize) || 1;
+    currentPage = totalPages;
+    renderTable();
+};
+
+// Render Results Table Rows with Virtual Pagination (Blazing fast for 100k+ records)
 function renderTable() {
     const tbody = document.getElementById('resultsTableBody');
     tbody.innerHTML = '';
 
-    document.getElementById('showingCountText').textContent = `Showing ${filteredResults.length} of ${currentResults.length} records`;
+    const totalCount = filteredResults.length;
+    const totalPages = Math.ceil(totalCount / pageSize) || 1;
+    if (currentPage > totalPages) currentPage = totalPages;
 
-    if (filteredResults.length === 0) {
+    const startIdx = (currentPage - 1) * pageSize;
+    const endIdx = Math.min(startIdx + pageSize, totalCount);
+    const pageRows = filteredResults.slice(startIdx, endIdx);
+
+    const countText = document.getElementById('showingCountText');
+    if (countText) {
+        countText.textContent = totalCount === 0
+            ? 'No matching records found.'
+            : `Showing rows ${startIdx + 1}–${endIdx} of ${totalCount.toLocaleString()} matching records (Dataset total: ${currentResults.length.toLocaleString()})`;
+    }
+
+    const pageInfo = document.getElementById('pageInfoText');
+    if (pageInfo) pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+
+    const pageBadge = document.getElementById('currentPageBadge');
+    if (pageBadge) pageBadge.textContent = currentPage;
+
+    const btnFirst = document.getElementById('btnFirstPage');
+    if (btnFirst) btnFirst.disabled = currentPage <= 1;
+    const btnPrev = document.getElementById('btnPrevPage');
+    if (btnPrev) btnPrev.disabled = currentPage <= 1;
+    const btnNext = document.getElementById('btnNextPage');
+    if (btnNext) btnNext.disabled = currentPage >= totalPages;
+    const btnLast = document.getElementById('btnLastPage');
+    if (btnLast) btnLast.disabled = currentPage >= totalPages;
+
+    if (totalCount === 0) {
         tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 2rem; color: #94a3b8;">No matching records found.</td></tr>`;
         return;
     }
 
-    filteredResults.forEach(r => {
+    pageRows.forEach(r => {
         const tr = document.createElement('tr');
-        const exp = r.explanation;
+        const valA = r.original_a || (r.explanation ? r.explanation.original_a : '');
+        const valB = r.original_b || (r.explanation ? r.explanation.original_b : '');
 
         // Color badge determination
         let badgeClass = 'badge-none';
@@ -525,8 +586,8 @@ function renderTable() {
 
         tr.innerHTML = `
             <td><strong>#${r.row_index}</strong></td>
-            <td><div style="font-weight: 500;">${escapeHtml(exp.original_a)}</div></td>
-            <td><div style="font-weight: 500;">${escapeHtml(exp.original_b)}</div></td>
+            <td><div style="font-weight: 500;">${escapeHtml(valA)}</div></td>
+            <td><div style="font-weight: 500;">${escapeHtml(valB)}</div></td>
             <td>
                 <div class="score-cell">
                     <span class="score-number">${r.score}%</span>
@@ -546,12 +607,37 @@ function renderTable() {
     });
 }
 
-// Open Explainability Modal for selected row
-window.showExplanation = function(rowIndex) {
+// Open Explainability Modal for selected row (Fetches on-demand if needed)
+window.showExplanation = async function(rowIndex) {
     const record = currentResults.find(r => r.row_index === rowIndex);
     if (!record) return;
 
-    const exp = record.explanation;
+    let exp = record.explanation;
+    if (!exp || !exp.component_scores) {
+        try {
+            const res = await fetch(`/api/match/explain/${currentJobId}/${rowIndex}`);
+            if (res.ok) {
+                const data = await res.json();
+                exp = data.explanation;
+                record.explanation = exp;
+            }
+        } catch (err) {
+            console.error('Failed to load on-demand explanation', err);
+        }
+    }
+
+    if (!exp) {
+        exp = {
+            original_a: record.original_a,
+            original_b: record.original_b,
+            normalized_a: record.original_a,
+            normalized_b: record.original_b,
+            summary: record.summary,
+            matching_tokens: [],
+            component_scores: {},
+            applied_weights: {},
+        };
+    }
 
     document.getElementById('modalOriginalA').textContent = exp.original_a || '(empty)';
     document.getElementById('modalOriginalB').textContent = exp.original_b || '(empty)';
@@ -581,7 +667,7 @@ window.showExplanation = function(rowIndex) {
     const compContainer = document.getElementById('modalComponentsList');
     compContainer.innerHTML = '';
     for (const [key, val] of Object.entries(exp.component_scores || {})) {
-        const weight = exp.applied_weights[key] ? ` (${exp.applied_weights[key]}% wt)` : '';
+        const weight = exp.applied_weights && exp.applied_weights[key] ? ` (${exp.applied_weights[key]}% wt)` : '';
         const row = document.createElement('div');
         row.className = 'metric-row';
         row.innerHTML = `

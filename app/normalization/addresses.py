@@ -63,12 +63,16 @@ class AddressParser:
             normalize_numbers=True,
             category="address",
         )
+        self._cache: Dict[str, ParsedAddress] = {}
 
     def parse(self, text: str) -> ParsedAddress:
         if not text:
             return ParsedAddress(raw="", normalized="")
 
         raw_str = str(text).strip()
+        if raw_str in self._cache:
+            return self._cache[raw_str]
+
         normalized = default_normalizer.normalize(raw_str, self.settings)
 
         postal_code = None
@@ -127,7 +131,7 @@ class AddressParser:
         if locality_match:
             locality = locality_match.group(1).strip()
 
-        return ParsedAddress(
+        parsed = ParsedAddress(
             raw=raw_str,
             normalized=normalized,
             house_number=house_number,
@@ -137,6 +141,10 @@ class AddressParser:
             state=state,
             postal_code=postal_code,
         )
+        if len(self._cache) > 10000:
+            self._cache.clear()
+        self._cache[raw_str] = parsed
+        return parsed
 
 
 default_address_parser = AddressParser()

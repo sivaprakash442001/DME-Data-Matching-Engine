@@ -37,9 +37,51 @@ class AddressMatcher:
         raw_a = str(str_a or "").strip()
         raw_b = str(str_b or "").strip()
 
+        if raw_a == raw_b and raw_a:
+            weights = get_weights_for_type("address", custom_weights)
+            component_scores = {
+                "house_number": 100.0,
+                "street": 100.0,
+                "locality": 100.0,
+                "city_state": 100.0,
+                "postal_code": 100.0,
+                "token_similarity": 100.0,
+            }
+            return self.scorer.build_result(
+                original_a=raw_a,
+                original_b=raw_b,
+                normalized_a=raw_a,
+                normalized_b=raw_b,
+                component_scores=component_scores,
+                weights=weights,
+                matching_type="address",
+                custom_summary="Identical address match across all components.",
+            )
+
         # Parse components
         addr_a = self.parser.parse(raw_a)
         addr_b = self.parser.parse(raw_b)
+
+        if addr_a.normalized == addr_b.normalized and addr_a.normalized:
+            weights = get_weights_for_type("address", custom_weights)
+            component_scores = {
+                "house_number": 100.0,
+                "street": 100.0,
+                "locality": 100.0,
+                "city_state": 100.0,
+                "postal_code": 100.0,
+                "token_similarity": 100.0,
+            }
+            return self.scorer.build_result(
+                original_a=raw_a,
+                original_b=raw_b,
+                normalized_a=addr_a.normalized,
+                normalized_b=addr_b.normalized,
+                component_scores=component_scores,
+                weights=weights,
+                matching_type="address",
+                custom_summary="Normalized identical address match.",
+            )
 
         # 1. House number similarity
         # If both have numbers: exact match -> 100, different -> 0 (or slight partial if 12 vs 12-A)

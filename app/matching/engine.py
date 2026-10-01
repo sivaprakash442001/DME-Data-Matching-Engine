@@ -138,12 +138,13 @@ class MatchingEngine:
             samples = list(df[col_a].dropna().astype(str).head(30)) + list(df[col_b].dropna().astype(str).head(30))
             detected_col_type, _ = detect_column_type(samples, col_a)
 
-        for idx, row in df.iterrows():
-            val_a = row.get(col_a, "")
-            val_b = row.get(col_b, "")
+        # Extract columns as lists for maximum throughput and minimal memory overhead
+        vals_a = df[col_a].fillna("").astype(str).tolist()
+        vals_b = df[col_b].fillna("").astype(str).tolist()
+        active_type = detected_col_type if matching_type in ("auto", "auto_detect") else matching_type
+        update_interval = max(1, min(100, total // 100)) if total > 0 else 1
 
-            # Use detected column type if auto
-            active_type = detected_col_type if matching_type in ("auto", "auto_detect") else matching_type
+        for idx, (val_a, val_b) in enumerate(zip(vals_a, vals_b)):
             result = self.match_pair(
                 val_a=val_a,
                 val_b=val_b,
@@ -153,7 +154,6 @@ class MatchingEngine:
             )
             results.append(result)
 
-            update_interval = max(1, min(50, total // 100)) if total > 0 else 1
             if progress_callback and (idx % update_interval == 0 or idx == total - 1):
                 progress_callback(idx + 1, total)
 
@@ -185,7 +185,16 @@ class MatchingEngine:
                 "weight": (w / total_weight) * 100.0 if total_weight > 0 else 100.0 / len(column_configs),
             })
 
-        for idx, row in df.iterrows():
+        col_lists = {}
+        for c in norm_configs:
+            if c["col_a"] not in col_lists:
+                col_lists[c["col_a"]] = df[c["col_a"]].fillna("").astype(str).tolist()
+            if c["col_b"] not in col_lists:
+                col_lists[c["col_b"]] = df[c["col_b"]].fillna("").astype(str).tolist()
+
+        update_interval = max(1, min(100, total // 100)) if total > 0 else 1
+
+        for idx in range(total):
             composite_score = 0.0
             component_scores = {}
             explanations = []
@@ -202,8 +211,8 @@ class MatchingEngine:
                 m_type = cfg["type"]
 
                 sub_res = self.match_pair(
-                    val_a=row.get(col_a, ""),
-                    val_b=row.get(col_b, ""),
+                    val_a=col_lists[col_a][idx],
+                    val_b=col_lists[col_b][idx],
                     matching_type=m_type,
                     settings=settings,
                 )

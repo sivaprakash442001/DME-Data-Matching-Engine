@@ -5,8 +5,10 @@ import os
 import uuid
 from typing import Dict, List, Optional, Any
 import pandas as pd
+import gc
+import threading
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query, BackgroundTasks
-from fastapi.responses import HTMLResponse, Response, StreamingResponse
+from fastapi.responses import HTMLResponse, Response, StreamingResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
@@ -27,8 +29,6 @@ from app.utils.sample_generator import (
 
 router = APIRouter()
 
-import threading
-
 # In-memory storage for active sessions/jobs (persisted for the application lifecycle)
 UPLOAD_CACHE: Dict[str, Dict[str, Any]] = {}
 JOB_CACHE: Dict[str, Dict[str, Any]] = {}
@@ -36,6 +36,8 @@ JOB_PROGRESS: Dict[str, Dict[str, Any]] = {}
 
 UPLOAD_DIR = os.path.abspath("data/uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+EXPORT_DIR = os.path.abspath("data/exports")
+os.makedirs(EXPORT_DIR, exist_ok=True)
 
 
 class QuickMatchRequest(BaseModel):
@@ -249,6 +251,13 @@ def execute_matching_job_worker(job_id: str, req: MatchJobRequest, df: pd.DataFr
 
         df_results = results_to_dataframe(results, col_a_name=col_a_name, col_b_name=col_b_name)
 
+        # Pre-save export CSV directly to disk for 0-RAM streaming download
+        export_csv_path = os.path.join(EXPORT_DIR, f"{job_id}.csv")
+        try:
+            df_results.to_csv(export_csv_path, index=False)
+        except Exception:
+            pass
+
         stats = {
             "total": len(results),
             "strong": strong_count,
@@ -269,14 +278,22 @@ def execute_matching_job_worker(job_id: str, req: MatchJobRequest, df: pd.DataFr
             "matching_type": req.matching_type,
             "total_rows": len(results),
             "stats": stats,
+            "export_csv": export_csv_path,
         }
 
-        # Return serialized results
-        serialized_results = []
+        # Build lightweight row summaries (only ~1MB for 15,000 rows instead of 15MB+)
+        lightweight_results = []
         for idx, r in enumerate(results, start=1):
-            d = r.to_dict()
-            d["row_index"] = idx
-            serialized_results.append(d)
+            lightweight_results.append({
+                "row_index": idx,
+                "score": r.score,
+                "status": r.status,
+                "confidence": r.confidence,
+                "matching_type": r.matching_type,
+                "original_a": r.explanation.original_a,
+                "original_b": r.explanation.original_b,
+                "summary": r.explanation.summary,
+            })
 
         if job_id in JOB_PROGRESS:
             JOB_PROGRESS[job_id]["status"] = "completed"
@@ -284,13 +301,22 @@ def execute_matching_job_worker(job_id: str, req: MatchJobRequest, df: pd.DataFr
             JOB_PROGRESS[job_id]["processed"] = total_rows
             JOB_PROGRESS[job_id]["message"] = f"Finished matching all {total_rows:,} records!"
             JOB_PROGRESS[job_id]["stats"] = stats
-            JOB_PROGRESS[job_id]["results"] = serialized_results
+            JOB_PROGRESS[job_id]["results"] = lightweight_results
+
+        # Keep only latest 2 jobs in memory to protect 512MB RAM
+        while len(JOB_CACHE) > 2:
+            old_k = next(iter(JOB_CACHE))
+            del JOB_CACHE[old_k]
+        while len(UPLOAD_CACHE) > 2:
+            old_k = next(iter(UPLOAD_CACHE))
+            del UPLOAD_CACHE[old_k]
+        gc.collect()
 
         return {
             "status": "success",
             "job_id": job_id,
             "stats": stats,
-            "results": serialized_results,
+            "results": lightweight_results,
         }
 
     except Exception as e:
@@ -379,6 +405,27 @@ async def get_match_progress(job_id: str):
     return JOB_PROGRESS[job_id]
 
 
+@router.get("/api/match/explain/{job_id}/{row_index}")
+async def get_match_row_explanation(job_id: str, row_index: int):
+    """
+    Fetch on-demand deep explainability and component breakdown for a specific row.
+    """
+    if job_id not in JOB_CACHE:
+        raise HTTPException(status_code=404, detail="Matching session expired or not found.")
+    results = JOB_CACHE[job_id]["results"]
+    if row_index < 1 or row_index > len(results):
+        raise HTTPException(status_code=400, detail="Row index out of range.")
+    r = results[row_index - 1]
+    return {
+        "row_index": row_index,
+        "score": r.score,
+        "status": r.status,
+        "confidence": r.confidence,
+        "matching_type": r.matching_type,
+        "explanation": r.explanation.to_dict(),
+    }
+
+
 @router.post("/api/quick-match")
 async def quick_match(req: QuickMatchRequest):
     """
@@ -414,25 +461,40 @@ async def get_job_results(job_id: str):
         raise HTTPException(status_code=404, detail="Job not found")
 
     job = JOB_CACHE[job_id]
-    serialized = []
+    lightweight = []
     for idx, r in enumerate(job["results"], start=1):
-        d = r.to_dict()
-        d["row_index"] = idx
-        serialized.append(d)
+        lightweight.append({
+            "row_index": idx,
+            "score": r.score,
+            "status": r.status,
+            "confidence": r.confidence,
+            "matching_type": r.matching_type,
+            "original_a": r.explanation.original_a,
+            "original_b": r.explanation.original_b,
+            "summary": r.explanation.summary,
+        })
 
     return {
         "status": "success",
         "job_id": job_id,
         "stats": job["stats"],
-        "results": serialized,
+        "results": lightweight,
     }
 
 
 @router.get("/api/export/{job_id}")
 async def export_job_results(job_id: str, format: str = Query("csv", pattern="^(csv|xlsx)$")):
     """
-    Export results as CSV or Excel (.xlsx).
+    Export results as CSV or Excel (.xlsx). CSV is streamed directly from disk with 0 RAM usage.
     """
+    csv_disk_path = os.path.join(EXPORT_DIR, f"{job_id}.csv")
+    if format.lower() == "csv" and os.path.exists(csv_disk_path):
+        return FileResponse(
+            csv_disk_path,
+            media_type="text/csv; charset=utf-8",
+            filename=f"match_results_{job_id[:8]}.csv",
+        )
+
     if job_id not in JOB_CACHE:
         raise HTTPException(status_code=404, detail="Job not found")
 
@@ -443,16 +505,20 @@ async def export_job_results(job_id: str, format: str = Query("csv", pattern="^(
         content = export_to_excel_bytes(df_results)
         media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         filename = f"match_results_{job_id[:8]}.xlsx"
+        return Response(
+            content=content,
+            media_type=media_type,
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
     else:
         content = export_to_csv_bytes(df_results)
         media_type = "text/csv; charset=utf-8"
         filename = f"match_results_{job_id[:8]}.csv"
-
-    return Response(
-        content=content,
-        media_type=media_type,
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
-    )
+        return Response(
+            content=content,
+            media_type=media_type,
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
 
 
 @router.get("/api/dictionary")
