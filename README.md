@@ -1,6 +1,7 @@
 # 🚀 Intelligent Data Matching Engine & Entity Resolution
 
 An enterprise-grade, high-precision Python entity resolution and fuzzy data matching application built with **FastAPI**, **Pandas**, and an interactive modern web interface.
+
 **Site** - https://dme-data-matching-engine.onrender.com/
 
 Designed for robust entity matching across **Addresses**, **Person Names**, **Company Names**, **Emails**, **Phone Numbers**, **IDs / Codes**, and **Generic Text** with **modular multi-algorithm similarity scoring (0–100)** and **deep explainability ("Why did these match?")**.
