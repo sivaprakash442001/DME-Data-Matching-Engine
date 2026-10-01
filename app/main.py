@@ -5,7 +5,7 @@ import os
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.web.routes import router as api_router
@@ -42,15 +42,19 @@ templates = Jinja2Templates(directory=templates_dir)
 app.include_router(api_router)
 
 
-@app.get("/", response_class=HTMLResponse)
+@app.api_route("/", methods=["GET", "HEAD"], response_class=HTMLResponse)
 async def serve_index(request: Request):
     """Serve main interactive dashboard."""
     return templates.TemplateResponse(request=request, name="index.html")
 
 
+@app.api_route("/health", methods=["GET", "HEAD"])
+async def health():
+    return {"status": "healthy"}
+
+
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
-    from fastapi.responses import Response
     return Response(status_code=204)
 
 

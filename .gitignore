@@ -38,3 +38,4 @@ data/exports/*
 *.swo
 .DS_Store
 Thumbs.db
+cloudflared.exe
