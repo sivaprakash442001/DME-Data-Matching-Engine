@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Matching Engine & Entity Resolution</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="brand">
+            <div class="brand-icon">
+                <i class="fa-solid fa-code-compare"></i>
+            </div>
+            <div>
+                <div class="brand-title">Data Matching Engine</div>
+                <div class="brand-subtitle">High-Precision Entity Resolution & Explainable Similarity</div>
+            </div>
+        </div>
+        <div class="nav-actions">
+            <div class="tabs-nav">
+                <button class="tab-btn active" data-tab="tabDataset">
+                    <i class="fa-solid fa-table-list"></i> Dataset Matching
+                </button>
+                <button class="tab-btn" data-tab="tabSandbox">
+                    <i class="fa-solid fa-bolt"></i> Quick Sandbox
+                </button>
+            </div>
+            <button class="btn btn-secondary btn-sm" id="btnDictionary">
+                <i class="fa-solid fa-book"></i> Abbreviation Dictionary
+            </button>
+            <button class="btn btn-secondary btn-sm" id="btnSettings">
+                <i class="fa-solid fa-sliders"></i> Engine Rules
+            </button>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <div class="container">
+
+        <!-- TAB 1: DATASET MATCHING -->
+        <div id="tabDataset" class="tab-content">
+            
+            <!-- Step 1: Upload Card -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fa-solid fa-file-arrow-up" style="color: var(--primary);"></i>
+                        1. Upload CSV / Excel Dataset
+                    </div>
+                </div>
+
+                <div class="dropzone-container" id="dropzone">
+                    <div class="dropzone-icon">
+                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                    </div>
+                    <div class="dropzone-title">Drop your CSV, XLSX, XLS, or JSON file here</div>
+                    <div class="dropzone-subtitle">or click to browse from your computer</div>
+                    <input type="file" id="fileInput" accept=".csv,.xlsx,.xls,.json" style="display: none;" />
+
+                    <div class="samples-strip" onclick="event.stopPropagation();">
+                        <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500;">Or try quick demo datasets:</span>
+                        <button type="button" class="sample-tag" onclick="loadSample('addresses')">
+                            📍 Address Matching
+                        </button>
+                        <button type="button" class="sample-tag" onclick="loadSample('companies')">
+                            🏢 Company Names
+                        </button>
+                        <button type="button" class="sample-tag" onclick="loadSample('names')">
+                            👤 Person Names
+                        </button>
+                        <button type="button" class="sample-tag" onclick="loadSample('customers')">
+                            📋 Customer Master
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Uploaded File Badge -->
+                <div id="fileBadge" class="file-card hidden">
+                    <div class="file-info">
+                        <div class="file-icon">
+                            <i class="fa-solid fa-file-csv"></i>
+                        </div>
+                        <div class="file-details">
+                            <h4 id="fileNameText">customers.xlsx</h4>
+                            <div class="file-meta-pills">
+                                <span class="meta-pill" id="fileRowsCount">0 rows</span>
+                                <span class="meta-pill" id="fileColsCount">0 columns</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <span class="badge badge-strong"><i class="fa-solid fa-circle-check"></i> File Ready</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 2: Configuration Card -->
+            <div class="card hidden" id="configCard">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fa-solid fa-sliders" style="color: var(--primary);"></i>
+                        2. Column Selection & Matching Engine
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <label style="font-size: 0.85rem; font-weight: 600; color: #475569; display: flex; align-items: center; gap: 0.4rem; cursor: pointer;">
+                            <input type="checkbox" id="multiColToggle" /> Multi-Column Matching Mode
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Single Pair Mode -->
+                <div id="singleColSection">
+                    <div class="config-grid">
+                        <div class="form-group">
+                            <label class="form-label" for="colSelectA">
+                                Source Column (Column 1)
+                                <span id="colTypeBadge" class="type-indicator hidden">Auto-Detected</span>
+                            </label>
+                            <select id="colSelectA" class="form-select">
+                                <option value="">-- Upload a file first --</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="colSelectB">Comparison Column (Column 2)</label>
+                            <select id="colSelectB" class="form-select">
+                                <option value="">-- Upload a file first --</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="matchingTypeSelect">Matching Engine Strategy</label>
+                            <select id="matchingTypeSelect" class="form-select">
+                                <option value="auto">✨ Auto Detect (Context-Aware)</option>
+                                <option value="address">📍 Address Matcher (Components + Postal)</option>
+                                <option value="person_name">👤 Person Name Matcher (Order & Initials)</option>
+                                <option value="company">🏢 Company Name Matcher (Legal Suffixes)</option>
+                                <option value="email">✉️ Email Matcher (Domain & Strict Aliases)</option>
+                                <option value="phone">📞 Phone Matcher (Country Codes & Digits)</option>
+                                <option value="id_code">🔢 ID / Code Matcher (Strict Alphanumeric)</option>
+                                <option value="generic_text">🔤 Generic Text (Composite Multi-Algorithm)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Multi-Column Mode Section -->
+                <div id="multiColSection" class="hidden" style="margin-top: 1rem;">
+                    <div style="background: #f8fafc; padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border);">
+                        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+                            Match across multiple column pairs (e.g. First Name + Last Name + City) and assign custom weights:
+                        </p>
+                        <div id="multiColRowsContainer"></div>
+                        <button type="button" class="btn btn-secondary btn-sm" id="btnAddColPair" style="margin-top: 0.5rem;">
+                            <i class="fa-solid fa-plus"></i> Add Column Pair
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Action Button -->
+                <div style="margin-top: 1.5rem; display: flex; justify-content: flex-end; align-items: center; gap: 1rem;">
+                    <button class="btn btn-primary btn-lg" id="btnStartMatch">
+                        <i class="fa-solid fa-bolt"></i> Start Matching
+                    </button>
+                </div>
+            </div>
+
+            <!-- Live Progress / Process Status Card -->
+            <div class="card hidden" id="processStatusCard" style="border: 1px solid var(--primary-border); background: #ffffff; box-shadow: var(--shadow-md);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                    <div style="display: flex; align-items: center; gap: 0.6rem;">
+                        <div class="spinner" id="processSpinner" style="width: 1.1rem; height: 1.1rem; border-color: #cbd5e1; border-top-color: var(--primary);"></div>
+                        <span style="font-weight: 700; color: #1e293b; font-size: 1.05rem;" id="processTitle">
+                            Processing Matching Engine...
+                        </span>
+                    </div>
+                    <span id="processPercentageBadge" style="font-size: 1.35rem; font-weight: 800; color: var(--primary);">0%</span>
+                </div>
+                
+                <!-- Animated Progress Bar -->
+                <div style="width: 100%; height: 14px; background: #e2e8f0; border-radius: var(--radius-full); overflow: hidden; margin-bottom: 0.75rem; box-shadow: inset 0 1px 2px rgba(0,0,0,0.08);">
+                    <div id="processProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #4f46e5, #06b6d4); border-radius: var(--radius-full); transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);"></div>
+                </div>
+                
+                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; color: var(--text-muted);">
+                    <span id="processRowsMessage"><i class="fa-solid fa-list-check"></i> Rows processed: 0 / 0</span>
+                    <span id="processStatusSub"><i class="fa-solid fa-bolt"></i> Normalizing tokens & evaluating fuzzy metrics...</span>
+                </div>
+            </div>
+
+            <!-- Step 3: Results Section -->
+            <div id="resultsSection" class="hidden">
+                <!-- Summary Stats -->
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <span class="stat-label">Total Records</span>
+                        <span class="stat-value" id="statTotalRows">0</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label">Strong Matches</span>
+                        <span class="stat-value" style="color: var(--match-strong);" id="statStrong">0</span>
+                        <span class="stat-badge badge-strong">90–100%</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label">Likely Matches</span>
+                        <span class="stat-value" style="color: var(--match-likely);" id="statLikely">0</span>
+                        <span class="stat-badge badge-likely">75–89%</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label">Possible Matches</span>
+                        <span class="stat-value" style="color: var(--match-possible);" id="statPossible">0</span>
+                        <span class="stat-badge badge-possible">50–74%</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label">Weak Matches</span>
+                        <span class="stat-value" style="color: var(--match-weak);" id="statWeak">0</span>
+                        <span class="stat-badge badge-weak">25–49%</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label">No Match</span>
+                        <span class="stat-value" style="color: var(--match-none);" id="statNoMatch">0</span>
+                        <span class="stat-badge badge-none">0–24%</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label">Average Score</span>
+                        <span class="stat-value" id="statAvgScore">0%</span>
+                    </div>
+                </div>
+
+                <!-- Table Card -->
+                <div class="card">
+                    <div class="table-controls">
+                        <div class="filter-pills">
+                            <button class="filter-pill active" data-filter="all">All</button>
+                            <button class="filter-pill" data-filter="strong">Strong Match</button>
+                            <button class="filter-pill" data-filter="likely">Likely Match</button>
+                            <button class="filter-pill" data-filter="possible">Possible Match</button>
+                            <button class="filter-pill" data-filter="weak">Weak Match</button>
+                            <button class="filter-pill" data-filter="no_match">No Match</button>
+                        </div>
+
+                        <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+                            <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--text-muted);">
+                                <span>Min Score:</span>
+                                <input type="range" id="scoreFilterSlider" min="0" max="100" value="0" style="width: 100px;" />
+                                <span id="scoreFilterVal" style="font-weight: 600; min-width: 25px;">0</span>%
+                            </div>
+
+                            <input type="text" id="tableSearch" class="form-input" placeholder="Search values or explanation..." style="width: 240px; padding: 0.45rem 0.75rem;" />
+
+                            <button class="btn btn-secondary btn-sm" id="btnExportCsv">
+                                <i class="fa-solid fa-file-csv"></i> Export CSV
+                            </button>
+                            <button class="btn btn-secondary btn-sm" id="btnExportXlsx">
+                                <i class="fa-solid fa-file-excel"></i> Export Excel
+                            </button>
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 0.5rem; font-size: 0.8rem; color: var(--text-muted);" id="showingCountText">
+                        Showing results...
+                    </div>
+
+                    <div class="table-wrapper">
+                        <table class="results-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 70px; cursor: pointer; user-select: none;" onclick="sortTable('row')">
+                                        Row <i class="fa-solid fa-sort" id="sortIconRow"></i>
+                                    </th>
+                                    <th style="cursor: pointer; user-select: none;" onclick="sortTable('val_a')">
+                                        Value A <i class="fa-solid fa-sort" id="sortIconValA"></i>
+                                    </th>
+                                    <th style="cursor: pointer; user-select: none;" onclick="sortTable('val_b')">
+                                        Value B <i class="fa-solid fa-sort" id="sortIconValB"></i>
+                                    </th>
+                                    <th style="width: 180px; cursor: pointer; user-select: none;" onclick="sortTable('score')">
+                                        Similarity <i class="fa-solid fa-sort" id="sortIconScore"></i>
+                                    </th>
+                                    <th style="width: 140px; cursor: pointer; user-select: none;" onclick="sortTable('status')">
+                                        Category <i class="fa-solid fa-sort" id="sortIconStatus"></i>
+                                    </th>
+                                    <th style="width: 140px;">Explainability</th>
+                                </tr>
+                            </thead>
+                            <tbody id="resultsTableBody">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- TAB 2: QUICK MATCH SANDBOX -->
+        <div id="tabSandbox" class="tab-content hidden">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fa-solid fa-flask" style="color: var(--primary);"></i>
+                        Interactive Similarity Sandbox
+                    </div>
+                </div>
+                <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1.5rem;">
+                    Test any two strings on the fly to inspect normalization, token alignment, and algorithm breakdown in real-time.
+                </p>
+
+                <div class="config-grid">
+                    <div class="form-group">
+                        <label class="form-label" for="quickInputA">String A</label>
+                        <input type="text" id="quickInputA" class="form-input" value="12, MG Road, Chennai" placeholder="Enter first string..." />
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="quickInputB">String B</label>
+                        <input type="text" id="quickInputB" class="form-input" value="12 MG Rd Chennai" placeholder="Enter second string..." />
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="quickMatchType">Matching Type</label>
+                        <select id="quickMatchType" class="form-select">
+                            <option value="auto">Auto Detect</option>
+                            <option value="address" selected>Address Matcher</option>
+                            <option value="person_name">Person Name Matcher</option>
+                            <option value="company">Company Matcher</option>
+                            <option value="email">Email Matcher</option>
+                            <option value="phone">Phone Matcher</option>
+                            <option value="id_code">ID / Code Matcher</option>
+                            <option value="generic_text">Generic Text</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="margin-top: 1.25rem; display: flex; justify-content: flex-end;">
+                    <button class="btn btn-primary" id="btnQuickCalculate">
+                        <i class="fa-solid fa-play"></i> Compare Strings
+                    </button>
+                </div>
+
+                <!-- Sandbox Result -->
+                <div id="quickResultBox" class="hidden" style="margin-top: 2rem; border-top: 1px solid var(--border); padding-top: 1.5rem;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+                        <div>
+                            <span style="font-size: 2rem; font-weight: 800; color: #1e293b;" id="quickScore">96%</span>
+                            <span class="badge badge-strong" id="quickStatus" style="margin-left: 0.75rem;">Strong Match</span>
+                        </div>
+                        <span id="quickConfidence" style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;"></span>
+                    </div>
+
+                    <p id="quickSummary" style="font-size: 0.9rem; color: #334155; margin-bottom: 1.25rem; background: #f8fafc; padding: 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border);"></p>
+
+                    <h5 style="font-size: 0.85rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.75rem;">Score Components Breakdown:</h5>
+                    <div id="quickComponents"></div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- MODAL 1: EXPLAIN MATCH DETAILS -->
+    <div id="explainModal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-magnifying-glass-chart" style="color: var(--primary);"></i> Match Explanation & Diagnostics</h3>
+                <button class="close-btn close-modal-trigger">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- Comparison Box -->
+                <div class="explain-comparison-box">
+                    <div class="explain-side">
+                        <h5>Original Value A</h5>
+                        <div class="val-raw" id="modalOriginalA"></div>
+                        <h5>Normalized A</h5>
+                        <div class="val-norm" id="modalNormA"></div>
+                    </div>
+                    <div class="explain-side">
+                        <h5>Original Value B</h5>
+                        <div class="val-raw" id="modalOriginalB"></div>
+                        <h5>Normalized B</h5>
+                        <div class="val-norm" id="modalNormB"></div>
+                    </div>
+                </div>
+
+                <!-- Score Badge & Summary -->
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; background: #f8fafc; padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border);">
+                    <div>
+                        <span style="font-size: 1.75rem; font-weight: 800;" id="modalScoreDisplay">94%</span>
+                        <span class="badge badge-strong" id="modalStatusDisplay" style="margin-left: 0.5rem;">Strong Match</span>
+                    </div>
+                    <span id="modalConfidenceDisplay" style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;"></span>
+                </div>
+
+                <div style="margin-bottom: 1.25rem;">
+                    <h5 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.4rem;">Evaluation Summary:</h5>
+                    <p id="modalSummaryText" style="font-size: 0.9rem; color: #334155; line-height: 1.5;"></p>
+                </div>
+
+                <!-- Matching Tokens Cloud -->
+                <div style="margin-bottom: 1.25rem;">
+                    <h5 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.4rem;">Matching Tokens:</h5>
+                    <div class="token-cloud" id="modalMatchingTokens"></div>
+                </div>
+
+                <!-- Component Metric Bars -->
+                <div>
+                    <h5 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.75rem;">Component Scores Breakdown:</h5>
+                    <div id="modalComponentsList"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary close-modal-trigger">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: ENGINE SETTINGS -->
+    <div id="settingsModal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-sliders" style="color: var(--primary);"></i> Normalization & Engine Rules</h3>
+                <button class="close-btn close-modal-trigger">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label class="form-label" for="normModeSelect">Normalization Strictness Mode</label>
+                    <select id="normModeSelect" class="form-select">
+                        <option value="standard" selected>Standard (Punctuation, Abbreviations, Numbers)</option>
+                        <option value="conservative">Conservative (Preserve symbols & punctuation)</option>
+                        <option value="aggressive">Aggressive (Strip all non-alphanumeric, full lower)</option>
+                    </select>
+                </div>
+
+                <h5 style="font-size: 0.85rem; text-transform: uppercase; color: var(--text-muted); margin-top: 1.25rem; margin-bottom: 0.5rem;">Rules & Transformations</h5>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #334155;">
+                        <input type="checkbox" id="normCaseSensitive" /> Case Sensitive
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #334155;">
+                        <input type="checkbox" id="normRemovePunct" checked /> Remove Punctuation
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #334155;">
+                        <input type="checkbox" id="normWhitespace" checked /> Normalize Spaces
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #334155;">
+                        <input type="checkbox" id="normExpandAbbr" checked /> Expand Abbreviations
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #334155;">
+                        <input type="checkbox" id="normNumbers" checked /> Normalize Numbers (#25, 1st Floor)
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary close-modal-trigger">Save & Apply</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 3: ABBREVIATION DICTIONARY -->
+    <div id="dictModal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-book" style="color: var(--primary);"></i> Abbreviation Dictionary Manager</h3>
+                <button class="close-btn close-modal-trigger">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+                    Add custom aliases or industry abbreviations that will be automatically expanded during normalization.
+                </p>
+
+                <!-- Add Rule Form -->
+                <form id="formAddDictRule" style="display: flex; gap: 0.5rem; margin-bottom: 1.25rem;">
+                    <input type="text" id="inputDictAbbr" class="form-input" placeholder="Abbreviation (e.g. bldg)" required style="flex: 1;" />
+                    <input type="text" id="inputDictExp" class="form-input" placeholder="Standard (e.g. building)" required style="flex: 1.5;" />
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="fa-solid fa-plus"></i> Add Rule
+                    </button>
+                </form>
+
+                <h5 style="font-size: 0.85rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.5rem;">Custom User Rules</h5>
+                <div class="table-wrapper" style="max-height: 240px; overflow-y: auto;">
+                    <table class="results-table">
+                        <thead>
+                            <tr>
+                                <th>Input Abbreviation</th>
+                                <th>Standard Representation</th>
+                                <th style="width: 80px;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="customDictTableBody">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary close-modal-trigger">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="modal-overlay">
+        <div style="background: white; padding: 2rem 3rem; border-radius: var(--radius-lg); text-align: center; box-shadow: var(--shadow-lg);">
+            <div class="spinner" style="width: 2.5rem; height: 2.5rem; border-width: 3px; border-color: #cbd5e1; border-top-color: var(--primary); margin-bottom: 1rem;"></div>
+            <div id="loadingMessage" style="font-weight: 600; font-size: 1rem; color: #1e293b;">Processing...</div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

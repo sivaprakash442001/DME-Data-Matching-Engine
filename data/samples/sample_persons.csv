@@ -1,0 +1,11 @@
+Name_A,Name_B,Expected_Category
+John Michael Smith,"Smith, John M.",Strong Match
+John Smith,Smith John,Strong Match
+John A Smith,John Albert Smith,Strong Match
+Dr. Robert Downey Jr.,"Downey, Robert",Likely Match
+Priya Ramesh Sharma,"Sharma, Priya R.",Strong Match
+Alexander Hamilton,"Hamilton, Alex",Likely Match
+Alice Wonder,Bob Builder,No Match
+David K. Johnson,D. K. Johnson,Strong Match
+Sundar Pichai,Pichai Sundararajan,Likely Match
+Karthik Subramanian,Karthik S,Likely Match

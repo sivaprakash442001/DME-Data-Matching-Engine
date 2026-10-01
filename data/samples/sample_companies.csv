@@ -1,0 +1,11 @@
+Company_A,Company_B,Expected_Category
+ABC Pvt. Ltd.,abc private limited,Strong Match
+ABC PVT LTD,ABC Private Limited,Strong Match
+A.B.C. PVT. LTD.,ABC PRIVATE LTD,Strong Match
+Acme Solutions Inc.,Acme Solutions Incorporated,Strong Match
+Reliance Industries Limited,Reliance Ind Ltd,Strong Match
+Global Tech Services Corp,Global Tech Services Corporation,Strong Match
+Tata Consultancy Services Ltd,Tata Consultancy Services,Strong Match
+Microsoft Corporation,Microsoft Corp,Strong Match
+XYZ Pharmaceuticals Ltd,ABC Logistics Pvt Ltd,No Match
+Apex Digital Media LLC,Apex Digital Solutions LLP,Likely Match

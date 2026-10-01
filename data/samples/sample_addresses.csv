@@ -1,0 +1,11 @@
+Address_A,Address_B,Expected_Category
+"12, MG Road, Chennai",12 MG Rd Chennai,Strong Match
+45 Anna Nagar West,45 Anna Nagar W,Strong Match
+100 Main Street,200 Main Street,Possible Match
+"Chennai, Tamil Nadu","Mumbai, Maharashtra",No Match
+"12, MG Road, Anna Nagar, Chennai, Tamil Nadu 600040",12 MG Rd Anna Nagar Chennai TN 600040,Strong Match
+"Flat 302, Green Valley Apts, Sector 14, Gurgaon","Unit 302, Green Valley Apartments, Sec 14, Gurugram",Strong Match
+"742 Evergreen Terrace, Springfield, OR 97477","742 Evergreen Terr, Springfield, Oregon 97477",Strong Match
+"No. 25, 1st Floor, 5th Cross, Indiranagar, Bangalore","#25, Floor 1, 5th Cross Rd, Indira Nagar, Bengaluru",Strong Match
+"1600 Amphitheatre Pkwy, Mountain View, CA 94043","1600 Amphitheatre Parkway, Mountain View, California",Strong Match
+"Suite 500, 350 5th Ave, New York, NY 10118","Ste 500, 350 Fifth Avenue, NY, New York",Strong Match
