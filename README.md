@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="app/web/static/images/logo.svg" width="76" height="76" alt="Data Matching Engine Logo" />
+</p>
+
 # 🚀 Intelligent Data Matching Engine & Entity Resolution
 
 An enterprise-grade, high-precision Python entity resolution and fuzzy data matching application built with **FastAPI**, **Pandas**, and an interactive modern web interface.
